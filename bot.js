@@ -110,7 +110,14 @@ async function handleMessage(msg) {
   const chatId = msg.chat.id;
   const text = msg.text;
 
-  if (msg.from.id !== ADMIN_ID) return;
+  if (msg.from.id !== ADMIN_ID) {
+    if (text) {
+      const db = loadReplies();
+      const match = db[text.trim().toLowerCase()];
+      if (match) await sendReply(chatId, match);
+    }
+    return;
+  }
 
   if (text === '/start' || text === '❌ បោះបង់') {
     state = null;
