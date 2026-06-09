@@ -103,7 +103,7 @@ async function handleMessage(msg) {
       for (let i = 0; i < keys.length; i += 2) rows.push(keys.slice(i, i + 2));
       await request('sendMessage', {
         chat_id: chatId,
-        text: 'សួស្តី! 👋 សូមជ្រើសរើស៖',
+        text: `📋 បញ្ជីពាក្យឆ្លើយតប (${keys.length} ពាក្យ)\n\nសូមជ្រើសរើសពាក្យ៖`,
         reply_markup: { keyboard: rows, resize_keyboard: true },
       });
       return;
