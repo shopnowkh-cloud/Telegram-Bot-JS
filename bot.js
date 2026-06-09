@@ -1,9 +1,15 @@
 import https from 'https';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const ADMIN_ID = Number(process.env.ADMIN_CHAT_ID);
 
 if (!TOKEN) {
   console.error('Error: TELEGRAM_BOT_TOKEN is not set.');
+  process.exit(1);
+}
+
+if (!ADMIN_ID) {
+  console.error('Error: ADMIN_CHAT_ID is not set.');
   process.exit(1);
 }
 
@@ -33,7 +39,11 @@ async function poll(offset = 0) {
       for (const update of updates) {
         offset = update.update_id + 1;
         const msg = update.message;
-        if (msg?.text === '/start') {
+        if (!msg) continue;
+
+        if (msg.from.id !== ADMIN_ID) continue;
+
+        if (msg.text === '/start') {
           await request('sendMessage', { chat_id: msg.chat.id, text: 'សួស្តី' });
         }
       }
@@ -44,5 +54,5 @@ async function poll(offset = 0) {
   }
 }
 
-console.log('Bot is running...');
+console.log('Bot is running... Admin only mode.');
 poll();
