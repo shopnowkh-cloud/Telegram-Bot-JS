@@ -69,6 +69,17 @@ async function handleMessage(msg) {
     });
     return;
   }
+
+  if (state === 'waiting_keyword' && text) {
+    pendingKeyword = text.trim().toLowerCase();
+    state = 'waiting_reply';
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: `✅ ទទួលពាក្យ: ${text.trim()}\n\nជំហានទី២: សូមផ្ញើ អក្សរ, រូបភាព, វីដេអូ ឬ សំឡេង ដែលចង់តប៖`,
+      reply_markup: CANCEL_KEYBOARD,
+    });
+    return;
+  }
 }
 
 async function poll(offset = 0) {
