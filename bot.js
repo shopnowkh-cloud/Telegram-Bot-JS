@@ -116,7 +116,13 @@ function scheduleDelete(chatId, messageId, seconds) {
 
 async function sendReply(chatId, replyContent, autoDeleteSeconds = 0) {
   let res;
-  if (replyContent.type === 'text') {
+  if (replyContent.type === 'copy') {
+    res = await request('copyMessage', {
+      chat_id: chatId,
+      from_chat_id: replyContent.from_chat_id,
+      message_id: replyContent.message_id,
+    });
+  } else if (replyContent.type === 'text') {
     res = await request('sendMessage', { chat_id: chatId, text: replyContent.content });
   } else if (replyContent.type === 'photo') {
     res = await request('sendPhoto', { chat_id: chatId, photo: replyContent.content, caption: replyContent.caption });
@@ -133,6 +139,10 @@ async function sendReply(chatId, replyContent, autoDeleteSeconds = 0) {
 }
 
 function getReplyContent(msg) {
+  const isForwarded = !!(msg.forward_from || msg.forward_origin || msg.forward_from_chat);
+  if (isForwarded) {
+    return { type: 'copy', from_chat_id: msg.chat.id, message_id: msg.message_id };
+  }
   if (msg.text) return { type: 'text', content: msg.text };
   if (msg.photo) return { type: 'photo', content: msg.photo[msg.photo.length - 1].file_id, caption: msg.caption || '' };
   if (msg.video) return { type: 'video', content: msg.video.file_id, caption: msg.caption || '' };
