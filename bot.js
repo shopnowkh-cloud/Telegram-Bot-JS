@@ -264,6 +264,13 @@ async function handleMessage(msg) {
     await sendReply(chatId, replyContent);
     return;
   }
+
+  // Fallback: admin tests a keyword when no state is active
+  if (!state && text) {
+    const db = loadReplies();
+    const match = db[text.trim().toLowerCase()];
+    if (match) await sendReply(chatId, match);
+  }
 }
 
 async function poll(offset = 0) {
