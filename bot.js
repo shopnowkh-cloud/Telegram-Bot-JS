@@ -32,20 +32,38 @@ function request(method, body) {
   });
 }
 
+const MAIN_KEYBOARD = {
+  keyboard: [
+    ['បន្ថែមពាក្យថ្មី'],
+    ['បញ្ជីពាក្យ កែប្រែ&លុប'],
+  ],
+  resize_keyboard: true,
+  persistent: true,
+};
+
+async function handleMessage(msg) {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  if (msg.from.id !== ADMIN_ID) return;
+
+  if (text === '/start') {
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: '👨‍💻 ផ្ទាំងគ្រប់គ្រង Auto-Reply Bot\n\nសួស្ដីម្ចាស់គណនី សូមជ្រើសរើសមុខងារខាងក្រោម៖',
+      reply_markup: MAIN_KEYBOARD,
+    });
+    return;
+  }
+}
+
 async function poll(offset = 0) {
   while (true) {
     try {
       const { result: updates } = await request('getUpdates', { offset, timeout: 30 });
       for (const update of updates) {
         offset = update.update_id + 1;
-        const msg = update.message;
-        if (!msg) continue;
-
-        if (msg.from.id !== ADMIN_ID) continue;
-
-        if (msg.text === '/start') {
-          await request('sendMessage', { chat_id: msg.chat.id, text: 'សួស្តី' });
-        }
+        if (update.message) await handleMessage(update.message);
       }
     } catch (err) {
       console.error('Poll error:', err.message);
