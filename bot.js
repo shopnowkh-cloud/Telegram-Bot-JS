@@ -269,8 +269,13 @@ async function handleMessage(msg) {
 async function poll(offset = 0) {
   while (true) {
     try {
-      const { result: updates } = await request('getUpdates', { offset, timeout: 30 });
-      for (const update of updates) {
+      const res = await request('getUpdates', { offset, timeout: 30 });
+      if (!res.ok || !Array.isArray(res.result)) {
+        console.error('Bad response from Telegram:', JSON.stringify(res));
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      }
+      for (const update of res.result) {
         offset = update.update_id + 1;
         if (update.message) await handleMessage(update.message);
       }
@@ -280,6 +285,14 @@ async function poll(offset = 0) {
     }
   }
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
 
 console.log('Bot is running... Admin only mode.');
 poll();
