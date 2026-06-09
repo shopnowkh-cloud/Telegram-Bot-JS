@@ -3,15 +3,8 @@ import https from 'https';
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_ID = Number(process.env.ADMIN_CHAT_ID);
 
-if (!TOKEN) {
-  console.error('Error: TELEGRAM_BOT_TOKEN is not set.');
-  process.exit(1);
-}
-
-if (!ADMIN_ID) {
-  console.error('Error: ADMIN_CHAT_ID is not set.');
-  process.exit(1);
-}
+if (!TOKEN) { console.error('Error: TELEGRAM_BOT_TOKEN is not set.'); process.exit(1); }
+if (!ADMIN_ID) { console.error('Error: ADMIN_CHAT_ID is not set.'); process.exit(1); }
 
 const BASE = `https://api.telegram.org/bot${TOKEN}`;
 
@@ -41,17 +34,38 @@ const MAIN_KEYBOARD = {
   persistent: true,
 };
 
+const CANCEL_KEYBOARD = {
+  keyboard: [['❌ បោះបង់']],
+  resize_keyboard: true,
+};
+
+let state = null;
+let pendingKeyword = null;
+
 async function handleMessage(msg) {
   const chatId = msg.chat.id;
   const text = msg.text;
 
   if (msg.from.id !== ADMIN_ID) return;
 
-  if (text === '/start') {
+  if (text === '/start' || text === '❌ បោះបង់') {
+    state = null;
+    pendingKeyword = null;
     await request('sendMessage', {
       chat_id: chatId,
       text: '👨‍💻 ផ្ទាំងគ្រប់គ្រង Auto-Reply Bot\n\nសួស្ដីម្ចាស់គណនី សូមជ្រើសរើសមុខងារខាងក្រោម៖',
       reply_markup: MAIN_KEYBOARD,
+    });
+    return;
+  }
+
+  if (text === 'បន្ថែមពាក្យថ្មី') {
+    state = 'waiting_keyword';
+    pendingKeyword = null;
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: '🛠 ប្រព័ន្ធបន្ថែមពាក្យឆ្លើយតប\n\nជំហានទី១: សូមវាយ ពាក្យគន្លឹះ\n\n💡 ឧទាហរណ៍៖ សុំ qr, qr aba, qr code',
+      reply_markup: CANCEL_KEYBOARD,
     });
     return;
   }
