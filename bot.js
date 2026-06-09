@@ -53,6 +53,20 @@ const CANCEL_KEYBOARD = {
 let state = null;
 let pendingKeyword = null;
 
+async function sendReply(chatId, replyContent) {
+  if (replyContent.type === 'text') {
+    await request('sendMessage', { chat_id: chatId, text: replyContent.content });
+  } else if (replyContent.type === 'photo') {
+    await request('sendPhoto', { chat_id: chatId, photo: replyContent.content, caption: replyContent.caption });
+  } else if (replyContent.type === 'video') {
+    await request('sendVideo', { chat_id: chatId, video: replyContent.content, caption: replyContent.caption });
+  } else if (replyContent.type === 'voice') {
+    await request('sendVoice', { chat_id: chatId, voice: replyContent.content });
+  } else if (replyContent.type === 'audio') {
+    await request('sendAudio', { chat_id: chatId, audio: replyContent.content, caption: replyContent.caption });
+  }
+}
+
 function getReplyContent(msg) {
   if (msg.text) return { type: 'text', content: msg.text };
   if (msg.photo) return { type: 'photo', content: msg.photo[msg.photo.length - 1].file_id, caption: msg.caption || '' };
@@ -122,9 +136,11 @@ async function handleMessage(msg) {
 
     await request('sendMessage', {
       chat_id: chatId,
-      text: `🎉 រៀបចំរួចរាល់!\nពាក្យ [${displayKeyword}]`,
+      text: `🎉 រៀបចំរួចរាល់!\nពាក្យ [${displayKeyword}] វានឹងបង្ហាញលទ្ធផលដែលបានបញ្ចូល៖`,
       reply_markup: MAIN_KEYBOARD,
     });
+
+    await sendReply(chatId, replyContent);
     return;
   }
 }
