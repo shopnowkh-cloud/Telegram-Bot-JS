@@ -1,7 +1,9 @@
 import https from 'https';
+import fs from 'fs';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_ID = Number(process.env.ADMIN_CHAT_ID);
+const DB_FILE = './replies.json';
 
 if (!TOKEN) { console.error('Error: TELEGRAM_BOT_TOKEN is not set.'); process.exit(1); }
 if (!ADMIN_ID) { console.error('Error: ADMIN_CHAT_ID is not set.'); process.exit(1); }
@@ -25,6 +27,15 @@ function request(method, body) {
   });
 }
 
+function loadReplies() {
+  if (!fs.existsSync(DB_FILE)) return {};
+  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+}
+
+function saveReplies(db) {
+  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+}
+
 const MAIN_KEYBOARD = {
   keyboard: [
     ['បន្ថែមពាក្យថ្មី'],
@@ -41,6 +52,15 @@ const CANCEL_KEYBOARD = {
 
 let state = null;
 let pendingKeyword = null;
+
+function getReplyContent(msg) {
+  if (msg.text) return { type: 'text', content: msg.text };
+  if (msg.photo) return { type: 'photo', content: msg.photo[msg.photo.length - 1].file_id, caption: msg.caption || '' };
+  if (msg.video) return { type: 'video', content: msg.video.file_id, caption: msg.caption || '' };
+  if (msg.voice) return { type: 'voice', content: msg.voice.file_id };
+  if (msg.audio) return { type: 'audio', content: msg.audio.file_id, caption: msg.caption || '' };
+  return null;
+}
 
 async function handleMessage(msg) {
   const chatId = msg.chat.id;
@@ -77,6 +97,33 @@ async function handleMessage(msg) {
       chat_id: chatId,
       text: `✅ ទទួលពាក្យ: ${text.trim()}\n\nជំហានទី២: សូមផ្ញើ អក្សរ, រូបភាព, វីដេអូ ឬ សំឡេង ដែលចង់តប៖`,
       reply_markup: CANCEL_KEYBOARD,
+    });
+    return;
+  }
+
+  if (state === 'waiting_reply') {
+    const replyContent = getReplyContent(msg);
+    if (!replyContent) {
+      await request('sendMessage', {
+        chat_id: chatId,
+        text: '⚠️ មិនទទួលស្គាល់ប្រភេទនេះទេ។ សូមផ្ញើ អក្សរ, រូបភាព, វីដេអូ ឬ សំឡេង។',
+        reply_markup: CANCEL_KEYBOARD,
+      });
+      return;
+    }
+
+    const db = loadReplies();
+    db[pendingKeyword] = replyContent;
+    saveReplies(db);
+
+    const displayKeyword = pendingKeyword;
+    state = null;
+    pendingKeyword = null;
+
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: `🎉 រៀបចំរួចរាល់!\nពាក្យ [${displayKeyword}]`,
+      reply_markup: MAIN_KEYBOARD,
     });
     return;
   }
