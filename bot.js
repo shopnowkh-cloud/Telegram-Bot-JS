@@ -4,6 +4,7 @@ import fs from 'fs';
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_ID = Number(process.env.ADMIN_CHAT_ID);
 const DB_FILE = './replies.json';
+const CONFIG_FILE = './config.json';
 
 if (!TOKEN) { console.error('Error: TELEGRAM_BOT_TOKEN is not set.'); process.exit(1); }
 if (!ADMIN_ID) { console.error('Error: ADMIN_CHAT_ID is not set.'); process.exit(1); }
@@ -36,8 +37,25 @@ function saveReplies(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
 }
 
+function loadConfig() {
+  if (!fs.existsSync(CONFIG_FILE)) return { deleteAfterSeconds: 0 };
+  return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+}
+
+function saveConfig(cfg) {
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+}
+
+function formatDelay(seconds) {
+  if (seconds === 0) return 'បិទ (មិនលុប)';
+  if (seconds < 60) return `${seconds} វិនាទី`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m} នាទី ${s} វិនាទី` : `${m} នាទី`;
+}
+
 const MAIN_KEYBOARD = {
-  keyboard: [['បន្ថែមពាក្យថ្មី'], ['បញ្ជីពាក្យ កែប្រែ&លុប']],
+  keyboard: [['បន្ថែមពាក្យថ្មី'], ['បញ្ជីពាក្យ កែប្រែ&លុប'], ['⏱ កំណត់ Timer លុបសារ']],
   resize_keyboard: true,
   persistent: true,
 };
@@ -49,6 +67,16 @@ const CANCEL_KEYBOARD = {
 
 const ACTION_KEYBOARD = {
   keyboard: [['👁 មើល', '✏️ កែ', '🗑 លុប'], ['❌ បោះបង់']],
+  resize_keyboard: true,
+};
+
+const TIMER_KEYBOARD = {
+  keyboard: [
+    ['បិទ (មិនលុប)'],
+    ['10 វិ', '30 វិ', '1 នាទី'],
+    ['2 នាទី', '5 នាទី', '10 នាទី'],
+    ['❌ បោះបង់'],
+  ],
   resize_keyboard: true,
 };
 
@@ -64,17 +92,43 @@ let state = null;
 let pendingKeyword = null;
 let selectedKeyword = null;
 
-async function sendReply(chatId, replyContent) {
+// Parse timer keyboard shortcut labels to seconds
+function parseTimerLabel(label) {
+  if (label === 'បិទ (មិនលុប)') return 0;
+  if (label === '10 វិ') return 10;
+  if (label === '30 វិ') return 30;
+  if (label === '1 នាទី') return 60;
+  if (label === '2 នាទី') return 120;
+  if (label === '5 នាទី') return 300;
+  if (label === '10 នាទី') return 600;
+  return null;
+}
+
+// Schedule deletion of a sent message after delay
+function scheduleDelete(chatId, messageId, seconds) {
+  if (!seconds || seconds <= 0) return;
+  setTimeout(async () => {
+    try {
+      await request('deleteMessage', { chat_id: chatId, message_id: messageId });
+    } catch (_) {}
+  }, seconds * 1000);
+}
+
+async function sendReply(chatId, replyContent, autoDeleteSeconds = 0) {
+  let res;
   if (replyContent.type === 'text') {
-    await request('sendMessage', { chat_id: chatId, text: replyContent.content });
+    res = await request('sendMessage', { chat_id: chatId, text: replyContent.content });
   } else if (replyContent.type === 'photo') {
-    await request('sendPhoto', { chat_id: chatId, photo: replyContent.content, caption: replyContent.caption });
+    res = await request('sendPhoto', { chat_id: chatId, photo: replyContent.content, caption: replyContent.caption });
   } else if (replyContent.type === 'video') {
-    await request('sendVideo', { chat_id: chatId, video: replyContent.content, caption: replyContent.caption });
+    res = await request('sendVideo', { chat_id: chatId, video: replyContent.content, caption: replyContent.caption });
   } else if (replyContent.type === 'voice') {
-    await request('sendVoice', { chat_id: chatId, voice: replyContent.content });
+    res = await request('sendVoice', { chat_id: chatId, voice: replyContent.content });
   } else if (replyContent.type === 'audio') {
-    await request('sendAudio', { chat_id: chatId, audio: replyContent.content, caption: replyContent.caption });
+    res = await request('sendAudio', { chat_id: chatId, audio: replyContent.content, caption: replyContent.caption });
+  }
+  if (res && res.ok && res.result && autoDeleteSeconds > 0) {
+    scheduleDelete(chatId, res.result.message_id, autoDeleteSeconds);
   }
 }
 
@@ -93,6 +147,7 @@ async function handleUserMessage(msg) {
   const isGroup = msg.chat.type === 'group' || msg.chat.type === 'supergroup';
   const db = loadReplies();
   const keys = Object.keys(db);
+  const cfg = loadConfig();
 
   const isStart = text === '/start' || text?.startsWith('/start@');
 
@@ -123,7 +178,7 @@ async function handleUserMessage(msg) {
       try {
         await request('deleteMessage', { chat_id: chatId, message_id: msg.message_id });
       } catch (_) {}
-      await sendReply(chatId, match);
+      await sendReply(chatId, match, cfg.deleteAfterSeconds || 0);
     }
   }
 }
@@ -155,6 +210,51 @@ async function handleMessage(msg) {
       chat_id: chatId,
       text: '👨‍💻 ផ្ទាំងគ្រប់គ្រង Auto-Reply Bot\n\nសួស្ដីម្ចាស់គណនី សូមជ្រើសរើសមុខងារខាងក្រោម៖',
       reply_markup: MAIN_KEYBOARD,
+    });
+    return;
+  }
+
+  // Timer setting menu
+  if (text === '⏱ កំណត់ Timer លុបសារ') {
+    state = 'setting_timer';
+    const cfg = loadConfig();
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: `⏱ កំណត់ Timer លុបសារលទ្ធផលដោយស្វ័យប្រវត្តិ\n\n⚙️ ស្ថានភាពបច្ចុប្បន្ន: ${formatDelay(cfg.deleteAfterSeconds || 0)}\n\nសូមជ្រើសរើសរយៈពេល ឬ វាយលេខវិនាទី (ឧ: 45):`,
+      reply_markup: TIMER_KEYBOARD,
+    });
+    return;
+  }
+
+  if (state === 'setting_timer') {
+    const preset = parseTimerLabel(text);
+    let seconds = null;
+
+    if (preset !== null) {
+      seconds = preset;
+    } else if (/^\d+$/.test(text?.trim())) {
+      seconds = parseInt(text.trim(), 10);
+    }
+
+    if (seconds !== null) {
+      const cfg = loadConfig();
+      cfg.deleteAfterSeconds = seconds;
+      saveConfig(cfg);
+      state = null;
+      await request('sendMessage', {
+        chat_id: chatId,
+        text: seconds === 0
+          ? '✅ បានបិទ Timer — សារលទ្ធផលនឹងមិនត្រូវបានលុបទេ។'
+          : `✅ បានកំណត់ Timer — សារលទ្ធផលនឹងត្រូវបានលុបបន្ទាប់ពី ${formatDelay(seconds)}។`,
+        reply_markup: MAIN_KEYBOARD,
+      });
+      return;
+    }
+
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: '⚠️ សូមជ្រើសរើសពីប៊ូតុង ឬ វាយចំនួនវិនាទីជាលេខ (ឧ: 45)។',
+      reply_markup: TIMER_KEYBOARD,
     });
     return;
   }
