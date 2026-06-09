@@ -76,6 +76,36 @@ function getReplyContent(msg) {
   return null;
 }
 
+function buildListKeyboard(db) {
+  const keys = Object.keys(db);
+  if (keys.length === 0) return null;
+  return {
+    inline_keyboard: keys.map((kw) => [
+      { text: `📝 ${kw}`, callback_data: `view:${kw}` },
+      { text: '✏️', callback_data: `edit:${kw}` },
+      { text: '🗑', callback_data: `del:${kw}` },
+    ]),
+  };
+}
+
+async function sendList(chatId) {
+  const db = loadReplies();
+  const keys = Object.keys(db);
+  if (keys.length === 0) {
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: '📭 មិនទាន់មានពាក្យណាមួយទេ។\nសូមបន្ថែមពាក្យថ្មីជាមុន។',
+      reply_markup: MAIN_KEYBOARD,
+    });
+    return;
+  }
+  await request('sendMessage', {
+    chat_id: chatId,
+    text: `📋 បញ្ជីពាក្យឆ្លើយតប (${keys.length} ពាក្យ)\n\nចុច 📝 ដើម្បីមើល | ✏️ ដើម្បីកែ | 🗑 ដើម្បីលុប`,
+    reply_markup: buildListKeyboard(db),
+  });
+}
+
 async function handleMessage(msg) {
   const chatId = msg.chat.id;
   const text = msg.text;
@@ -101,6 +131,13 @@ async function handleMessage(msg) {
       text: '🛠 ប្រព័ន្ធបន្ថែមពាក្យឆ្លើយតប\n\nជំហានទី១: សូមវាយ ពាក្យគន្លឹះ\n\n💡 ឧទាហរណ៍៖ សុំ qr, qr aba, qr code',
       reply_markup: CANCEL_KEYBOARD,
     });
+    return;
+  }
+
+  if (text === 'បញ្ជីពាក្យ កែប្រែ&លុប') {
+    state = null;
+    pendingKeyword = null;
+    await sendList(chatId);
     return;
   }
 
@@ -139,8 +176,66 @@ async function handleMessage(msg) {
       text: `🎉 រៀបចំរួចរាល់!\nពាក្យ [${displayKeyword}] វានឹងបង្ហាញលទ្ធផលដែលបានបញ្ចូល៖`,
       reply_markup: MAIN_KEYBOARD,
     });
-
     await sendReply(chatId, replyContent);
+    return;
+  }
+}
+
+async function handleCallbackQuery(cb) {
+  if (cb.from.id !== ADMIN_ID) return;
+
+  const chatId = cb.message.chat.id;
+  const msgId = cb.message.message_id;
+  const data = cb.data;
+
+  await request('answerCallbackQuery', { callback_query_id: cb.id });
+
+  if (data.startsWith('view:')) {
+    const kw = data.slice(5);
+    const db = loadReplies();
+    if (!db[kw]) {
+      await request('sendMessage', { chat_id: chatId, text: `⚠️ ពាក្យ [${kw}] មិនមានទេ។` });
+      return;
+    }
+    await request('sendMessage', { chat_id: chatId, text: `👁 ការឆ្លើយតបសម្រាប់ពាក្យ [${kw}]៖` });
+    await sendReply(chatId, db[kw]);
+    return;
+  }
+
+  if (data.startsWith('del:')) {
+    const kw = data.slice(4);
+    const db = loadReplies();
+    delete db[kw];
+    saveReplies(db);
+
+    const keys = Object.keys(db);
+    if (keys.length === 0) {
+      await request('editMessageText', {
+        chat_id: chatId,
+        message_id: msgId,
+        text: '📭 មិនទាន់មានពាក្យណាមួយទេ។\nសូមបន្ថែមពាក្យថ្មីជាមុន។',
+      });
+    } else {
+      await request('editMessageText', {
+        chat_id: chatId,
+        message_id: msgId,
+        text: `📋 បញ្ជីពាក្យឆ្លើយតប (${keys.length} ពាក្យ)\n\nចុច 📝 ដើម្បីមើល | ✏️ ដើម្បីកែ | 🗑 ដើម្បីលុប`,
+        reply_markup: buildListKeyboard(db),
+      });
+    }
+    await request('sendMessage', { chat_id: chatId, text: `🗑 បានលុបពាក្យ [${kw}] រួចរាល់។` });
+    return;
+  }
+
+  if (data.startsWith('edit:')) {
+    const kw = data.slice(5);
+    state = 'waiting_reply';
+    pendingKeyword = kw;
+    await request('sendMessage', {
+      chat_id: chatId,
+      text: `✏️ កែប្រែពាក្យ [${kw}]\n\nសូមផ្ញើ អក្សរ, រូបភាព, វីដេអូ ឬ សំឡេង ថ្មី ដែលចង់តប៖`,
+      reply_markup: CANCEL_KEYBOARD,
+    });
     return;
   }
 }
@@ -152,6 +247,7 @@ async function poll(offset = 0) {
       for (const update of updates) {
         offset = update.update_id + 1;
         if (update.message) await handleMessage(update.message);
+        if (update.callback_query) await handleCallbackQuery(update.callback_query);
       }
     } catch (err) {
       console.error('Poll error:', err.message);
