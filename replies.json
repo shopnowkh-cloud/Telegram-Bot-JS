@@ -8,5 +8,18 @@
     "type": "copy",
     "from_chat_id": 5002402843,
     "message_id": 838
+  },
+  "ររ": {
+    "type": "copy",
+    "from_chat_id": 5002402843,
+    "message_id": 847
+  },
+  "រ": {
+    "type": "text",
+    "content": "🤖 New bot ㅤ\n✍️ Name: បង្កើតសំឡេង Ai\n🆔 Username: @limsovannradybot\n\n💳 គ្រាន់តែ សរសេរអក្សរណាមួយទៅកាន់បត នឹងបំប្លែងទៅជាសំឡេងដោយស្វ័យប្រវត្តិ។\n\n🌎 Languages 🇰🇭🇱🇦🇲🇾🇲🇨🇲🇲🇰🇷🇻🇳🇵🇰🇵🇹🇺🇸🇷🇺🇵🇭🇯🇵\n\n👥 Groups 👌"
+  },
+  "r": {
+    "type": "voice",
+    "content": "AwACAgUAAxkBAAIDXWooTB6Ibzysti6FjHeiJbu4StAtAAJ-IQACDZVBVR-hoWBa9-BtOwQ"
   }
 }

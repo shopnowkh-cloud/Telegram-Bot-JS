@@ -117,7 +117,8 @@ function scheduleDelete(chatId, messageId, seconds) {
 async function sendReply(chatId, replyContent, autoDeleteSeconds = 0) {
   let res;
   if (replyContent.type === 'copy') {
-    res = await request('forwardMessage', {
+    const method = replyContent.forward ? 'forwardMessage' : 'copyMessage';
+    res = await request(method, {
       chat_id: chatId,
       from_chat_id: replyContent.from_chat_id,
       message_id: replyContent.message_id,
@@ -140,14 +141,10 @@ async function sendReply(chatId, replyContent, autoDeleteSeconds = 0) {
 
 function getReplyContent(msg) {
   const isForwarded = !!(msg.forward_from || msg.forward_origin || msg.forward_from_chat);
-  if (isForwarded) {
-    return { type: 'copy', from_chat_id: msg.chat.id, message_id: msg.message_id };
+  const hasContent = !!(msg.text || msg.photo || msg.video || msg.voice || msg.audio || msg.document || msg.sticker);
+  if (hasContent) {
+    return { type: 'copy', from_chat_id: msg.chat.id, message_id: msg.message_id, forward: isForwarded };
   }
-  if (msg.text) return { type: 'text', content: msg.text };
-  if (msg.photo) return { type: 'photo', content: msg.photo[msg.photo.length - 1].file_id, caption: msg.caption || '' };
-  if (msg.video) return { type: 'video', content: msg.video.file_id, caption: msg.caption || '' };
-  if (msg.voice) return { type: 'voice', content: msg.voice.file_id };
-  if (msg.audio) return { type: 'audio', content: msg.audio.file_id, caption: msg.caption || '' };
   return null;
 }
 
