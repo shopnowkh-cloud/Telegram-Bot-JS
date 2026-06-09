@@ -1,11 +1,12 @@
 {
-  "57": {
-    "type": "photo",
-    "content": "AgACAgUAAxkBAAICX2ooPNxZKZ93drSvymBgeqzOnaiGAAL0EGsbDZVBVbT25EZBcSFtAQADAgADdwADOwQ",
-    "caption": ""
+  "12": {
+    "type": "copy",
+    "from_chat_id": 5002402843,
+    "message_id": 823
   },
-  "េ": {
-    "type": "text",
-    "content": "៣"
+  "99": {
+    "type": "copy",
+    "from_chat_id": 5002402843,
+    "message_id": 838
   }
 }

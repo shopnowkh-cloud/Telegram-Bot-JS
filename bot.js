@@ -117,7 +117,7 @@ function scheduleDelete(chatId, messageId, seconds) {
 async function sendReply(chatId, replyContent, autoDeleteSeconds = 0) {
   let res;
   if (replyContent.type === 'copy') {
-    res = await request('copyMessage', {
+    res = await request('forwardMessage', {
       chat_id: chatId,
       from_chat_id: replyContent.from_chat_id,
       message_id: replyContent.message_id,
