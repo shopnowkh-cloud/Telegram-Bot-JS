@@ -110,7 +110,10 @@ async function handleMessage(msg) {
     }
     if (text) {
       const match = db[text.trim().toLowerCase()];
-      if (match) await sendReply(chatId, match);
+      if (match) {
+        await request('deleteMessage', { chat_id: chatId, message_id: msg.message_id });
+        await sendReply(chatId, match);
+      }
     }
     return;
   }
@@ -269,7 +272,10 @@ async function handleMessage(msg) {
   if (!state && text) {
     const db = loadReplies();
     const match = db[text.trim().toLowerCase()];
-    if (match) await sendReply(chatId, match);
+    if (match) {
+      await request('deleteMessage', { chat_id: chatId, message_id: msg.message_id });
+      await sendReply(chatId, match);
+    }
   }
 }
 
