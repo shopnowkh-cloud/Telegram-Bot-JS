@@ -111,8 +111,27 @@ async function handleMessage(msg) {
   const text = msg.text;
 
   if (msg.from.id !== ADMIN_ID) {
+    const db = loadReplies();
+    const keys = Object.keys(db);
+
+    if (text === '/start') {
+      if (keys.length === 0) {
+        await request('sendMessage', { chat_id: chatId, text: 'សួស្តី! 👋' });
+        return;
+      }
+      const rows = [];
+      for (let i = 0; i < keys.length; i += 2) {
+        rows.push(keys.slice(i, i + 2));
+      }
+      await request('sendMessage', {
+        chat_id: chatId,
+        text: 'សួស្តី! 👋 សូមជ្រើសរើស៖',
+        reply_markup: { keyboard: rows, resize_keyboard: true },
+      });
+      return;
+    }
+
     if (text) {
-      const db = loadReplies();
       const match = db[text.trim().toLowerCase()];
       if (match) await sendReply(chatId, match);
     }
