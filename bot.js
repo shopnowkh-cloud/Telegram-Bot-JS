@@ -149,6 +149,21 @@ async function handleUserMessage(msg) {
   const keys = Object.keys(db);
   const cfg = loadConfig();
 
+  // In groups/supergroups: only keyword matching, nothing else
+  if (isGroup) {
+    if (text) {
+      const match = db[text.trim().toLowerCase()];
+      if (match) {
+        try {
+          await request('deleteMessage', { chat_id: chatId, message_id: msg.message_id });
+        } catch (_) {}
+        await sendReply(chatId, match, cfg.deleteAfterSeconds || 0);
+      }
+    }
+    return;
+  }
+
+  // Private chat (non-admin)
   const isStart = text === '/start' || text?.startsWith('/start@');
 
   if (isStart) {
@@ -161,14 +176,8 @@ async function handleUserMessage(msg) {
     await request('sendMessage', {
       chat_id: chatId,
       text: `📋 បញ្ជីពាក្យឆ្លើយតប (${keys.length} ពាក្យ)\n\nសូមជ្រើសរើសពាក្យ៖`,
-      reply_markup: isGroup ? { remove_keyboard: true } : { keyboard: rows, resize_keyboard: true },
+      reply_markup: { keyboard: rows, resize_keyboard: true },
     });
-    if (isGroup) {
-      await request('sendMessage', {
-        chat_id: chatId,
-        text: rows.map(r => r.join('   ')).join('\n'),
-      });
-    }
     return;
   }
 
